@@ -1,0 +1,30 @@
+root do
+it it
+vars az
+rule unary l 1  - n  n  + nop - neg = set * get / nop % nop
+rule mul r 2  mul unary  unary  * mul / div % mod
+rule add r 2  add mul  mul  + add - sub
+rule equ r 2  equ add  add  = equ # neq < lt > gt
+rule do3 l 2  equ do3  equ  ~ do
+rule then2 r 2  do3 do3  do3  ( pyif
+rule else2 l 2  then2 else2  do3  | else
+rule then l 2  do3 do3 do3  ? then
+rule else l 2  then else  else2  : else
+rule do2 l 2  else do2  else  , do
+rule while2 r 2  while2 do2  do2  ` while
+rule while l 2  while2 while  while2  @ while
+rule do l 2  while do  while  ; do
+end
+
+f,i,b;
+0 ~=m;
+1 ~=n;
+0 ~=i;
+0 ~=o;
+*i < 6 @
+    *o * 10 + *n ~=o,
+    *m ~=t,
+    *n ~=m,
+    *n + *t ~=n,
+    *i + 1 ~=i;
+*o
