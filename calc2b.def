@@ -1,7 +1,7 @@
 root do
 it it
 vars az
-rule unary l 1  - n  n  + nop - neg = set * get / nop % nop
+rule unary l 1  - n  n  + nop - neg = setit * get / nop % nop
 rule mul r 2  mul unary  unary  * mul / div % mod
 rule add r 2  add mul  mul  + add - sub
 rule equ r 2  equ add  add  = equ # neq < lt > gt

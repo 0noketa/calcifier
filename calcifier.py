@@ -5,9 +5,11 @@ import io
 class Calcifier:
     def __init__(self):
         self.root = "root"
+        self.lang = "calcifier_calc"
         self.rules = {}
         self.rules_by_priority = {}
         self.it = "it"
+        self.node_type = "calcifier_calc_node_t*"
         self.vars = self.crange("a", "z")
 
     def priorities(self):
@@ -24,12 +26,18 @@ class Calcifier:
             return False
 
         for src in file.read().splitlines():
-            if src == None or src == "end":
+            if src == None:
                 break
 
             src = list(filter(len, map(str.strip, src.split(" "))))
 
             if len(src) == 0 or src[0] == '#':
+                continue
+
+            if len(src) == 1 and src[0] == "end":
+                break
+
+            if self.load_lang(src):
                 continue
 
             if self.load_root(src):
@@ -48,10 +56,27 @@ class Calcifier:
 
             return False
 
+        return True
 
     def load_root(self, src: list) -> bool:
         if len(src) == 2 and src[0] == "root":
             self.root = src[1]
+
+            return True
+
+        return False
+
+    def load_lang(self, src: list) -> bool:
+        if len(src) == 2 and src[0] == "lang":
+            self.lang = src[1]
+
+            return True
+
+        return False
+
+    def load_type(self, src: list) -> bool:
+        if len(src) == 2 and src[0] == "type":
+            self.value_type = src[1]
 
             return True
 
@@ -168,8 +193,6 @@ class Calcifier:
         for key in self.priorities():
             self.generate_func(file, key)
 
-        self.generate_main(file)
-
         return True
 
     def generate_header(self, file: io.TextIOWrapper):
@@ -177,9 +200,9 @@ class Calcifier:
 
         file.write(f"""
 #include "calcifier_rtl.h"
+#include "{self.lang}.h"
 
-static int var_it;
-static int vars[256];
+typedef {self.node_type} node_t;
 
 """)
         for key in self.priorities():
@@ -187,13 +210,13 @@ static int vars[256];
             file.write("static " + self.func_header(rules[0]) + ";\n")
 
         file.write(f"""
-bool tryParse(char *s, ptrdiff_t len, int *out_value) {{
+bool {self.lang}_tryParse(char *s, ptrdiff_t len, node_t *out_value) {{
     return tryParse_{self.root}(s, len, out_value);
 }}
 """)
 
         file.write(f"""
-static bool tryParseName(char *s, ptrdiff_t len, int *out_value) {{
+static bool tryParseName(char *s, ptrdiff_t len, node_t *out_value) {{
     char *s2;
     ptrdiff_t len2;
     if (s == NULL || !*s || len == 0
@@ -201,29 +224,14 @@ static bool tryParseName(char *s, ptrdiff_t len, int *out_value) {{
         || len2 == 0)
         return false;
     if (len2 == 1 && strchr("{self.escape_str(self.vars)}", *s2)) {{
-        if (out_value) *out_value = *s2 % {len(self.vars)};
+        if (out_value) *out_value = {self.lang}_newnode_name_0(s2, 1);
         return true;
-    }} else if (len2 == 2 && strncmp(s2, "{self.escape_str(self.it)}", 2) == 0) {{
-        if (out_value) *out_value = var_it;
+    }} else if (len2 == {len(self.it)} && strncmp(s2, "{self.escape_str(self.it)}", {len(self.it)}) == 0) {{
+        if (out_value) *out_value = {self.lang}_newnode_it_0();
         return true;
     }}
     return false;
 }}
-""")
-
-    def generate_main(self, file: io.TextIOWrapper):
-        file.write("""
-int main(int argc, char *argv[]) {
-    if (argc <= 1) return 1;
-    char *expr = argv[1];
-    int result;
-    if (!tryParse(expr, strlen(expr), &result)) {
-        fputs("error\\n", stderr);
-        return 1;
-    }
-    printf("%d\\n", result);
-    return 0;
-}
 """)
 
     def func_name(self, rule) -> str:
@@ -231,13 +239,22 @@ int main(int argc, char *argv[]) {
 
     def func_header(self, rule) -> str:
         head = ""
-        t = "int"
 
         if self.is_then(rule):
             t = "Elseable"
 
         return (f'bool {self.func_name(rule)}' + 
-            f'(char *s, ptrdiff_t len, {t} *out_value)')
+            f'(char *s, ptrdiff_t len, node_t *out_value)')
+
+    def generate_nodefuncs(self, file: io.TextIOWrapper):
+        for r in self.rules:
+            file.write(f'extern node_t {self.lang}_{r["key"]}_{r["argc"]}(')
+
+            for i in range(r["argc"]):
+                if i > 0:
+                    file.write(", ")
+                file.write("node_t")
+            file.write(");\n")
 
     @staticmethod
     def escape_char(c):
@@ -255,34 +272,10 @@ int main(int argc, char *argv[]) {
 
         return "".join(list(map(f, rules)))
 
-    def binary_functions(self):
-        return {
-            "add": "left + right",
-            "sub": "left - right",
-            "mul": "left * right",
-            "div": "right ? left / right : 0",
-            "mod": "right ? left % right : 0",
-            "shl": "left << right",
-            "shr": "left >> right",
-            "equ": "left == right",
-            "neq": "left != right",
-            "lt": "left < right",
-            "gt": "left > right",
-            "lte": "left <= right",
-            "gte": "left >= right",
-            "max": "(left > right ? left : right)",
-            "min": "(left < right ? left : right)",
-            "bitand": "left & right",
-            "bitor": "left | right",
-            "bitxor": "left ^ right",
-            "left": "left",
-            "right": "right"
-        }
-
     def generate_func(self, file: io.TextIOWrapper, priority: str) -> bool:
         rules = self.rules_by_priority[priority]
         rule = rules[0]
-        find = "find"
+        skip = f'{self.lang}_skip{rule["order"]}'
 
         if rule["next"] == priority:
             return False
@@ -299,13 +292,8 @@ int main(int argc, char *argv[]) {
         if rule["argc"] not in range(1, 3):
             return False
 
-        if rule["order"] == "r":
-            find += "r"
-
-        find += "Any"
-
         file.write(f"""
-static {self.func_header(rule)} {{
+{self.func_header(rule)} {{
     char *s2;
     ptrdiff_t len2;
     if (s == NULL || !*s || len == 0
@@ -331,179 +319,60 @@ static {self.func_header(rule)} {{
         && {self.func_name(rule)}({next_idx}, len2 - 1, out_value))
     {{
         if (out_value) {{
-            *out_value = """)
+            """)
 
             for r in rules:
-                f = r["function"]
+                file.write(f"""if (s2[{idx}] == '{r["key"]}')
+                *out_value = {self.lang}_newnode_{r["function"]}_1(*out_value, {self.lang}_nilnode());
+            else """)
 
-                vals = {
-                    "nop": "*out_value",
-                    "neg": "-*out_value",
-                    "set": "(vars[abs(*out_value % 256)] = var_it)",
-                    "get": "vars[abs(*out_value % 256)]"
-                }
-
-                if f not in vals.keys():
-                    file.write(f'#error "unknown function {f}"')
-
-                    return False
-
-                file.write(f"""s2[{idx}] == '{r["key"]}' ? {vals[f]}
-                : """)
-
-            file.write("""*out_value;
-        }
+            file.write(f"""{{
+                {self.lang}_delnode(*out_value);
+                *out_value = {self.lang}_nilnode();
+            }}
+        }}
         return true;
-    }
-    return tryParseInt(s2, len2, out_value)
+    }}
+    return {self.lang}_tryParseValue(s2, len2, out_value)
         || tryParseName(s2, len2, out_value);
-}
-""")
+}}""")
             return True
 
         if rule["argc"] != 2:
             return False
 
-
-        if rule["function"] == "else":
-            if (len(rules) != 1
-                    or not self.is_then(
-                        self.rules_by_priority[rule["left"]][0])):
-                return False
-
-            file.write(f"""
-    ptrdiff_t opr = {find}(s2, len2, "{self.rules_to_keys(rules)}");    
-    if (opr < len2) {{
-        Elseable left;
-        if (!tryParse_{rule["left"]}(s2, opr, &left)) return false;
-        if (left.success) {{
-            if (out_value) *out_value = left.value;
-            return true;
-        }}
-        char *right_p = s2 + opr + 1;
-        ptrdiff_t right_len = len2 - opr - 1;
-        int right;
-        if (!tryParse_{rule["right"]}(right_p, right_len, &right)) return false;
-        if (out_value) *out_value = right;
-        return true;
-    }}
-    return tryParse_{rule["next"]}(s2, len2, out_value);
-}}
-""")
-
-            return True
-
-
-        # then/while/do
-        if rule["order"] == "l":
-            v_before = "left"
-            v_after = "right"
-            pos_before = "s2, opr"
-            pos_after = "right_p, right_len"
-        else:
-            v_before = "right"
-            v_after = "left"
-            pos_after = "s2, opr"
-            pos_before = "right_p, right_len"
-
-        if self.is_then(rule):
-            if len(rules) != 1:
-                return False
-
-            file.write(f"""
-    int left, right;
-    ptrdiff_t opr = {find}(s2, len2, "{rule["key"]}");    
-    if (opr < len2) {{
-        char *right_p = s2 + opr + 1;
-        ptrdiff_t right_len = len2 - opr - 1;
-        if (tryParse_{rule[v_before]}({pos_before}, &{v_before})
-            && tryParse_{rule[v_after]}({pos_after}, &{v_after}))
-        {{
-            if (out_value) *out_value = createElseable({v_before}, {v_after});
-            return true;
-        }}
-    }} else if (tryParse_{rule["next"]}(s2, len2, &left)) {{
-        if (out_value) *out_value = createElseable(left, left);
-        return true;
-    }}
-    if (out_value) *out_value = createElseable(false, 0);
-    return false;
-}}
-""")
-            return True
-
-        if self.is_do(rule):
-            if len(rules) > 1:
-                return False
-
-            file.write(f"""
-    int {v_before};
-    ptrdiff_t opr = {find}(s2, len2, "{rule["key"]}");
-    if (opr < len2) {{
-        char *right_p = s2 + opr + 1;
-        ptrdiff_t right_len = len2 - opr - 1;
-        if (!tryParse_{rule[v_before]}({pos_before}, &{v_before})) return false;
-        var_it = {v_before};
-        return tryParse_{rule[v_after]}({pos_after}, out_value);
-    }}
-    return tryParse_{rule["next"]}(s2, len2, out_value);
-}}
-""")
-            return True
-
-        if self.is_while(rule):
-            if len(rules) > 1:
-                return False
-
-            file.write(f"""
-    ptrdiff_t opr = {find}(s2, len2, "{rule["key"]}");    
-    if (opr < len2) {{
-        char *right_p = s2 + opr + 1;
-        ptrdiff_t right_len = len2 - opr - 1;
-        int left, right;
-        while (true) {{
-            if (!tryParse_{rule[v_before]}({pos_before}, &{v_before})) return false;
-            if (!{v_before}) break;
-            if (!tryParse_{rule[v_after]}({pos_after}, &{v_after})) return false;            
-            if (out_value) *out_value = {v_after};
-        }}
-        return true;
-    }}
-    return tryParse_{rule["next"]}(s2, len2, out_value);
-}}
-""")
-            return True
-
         # any binary operators
+        file.write(f"""
+    node_t left = {self.lang}_nilnode(), right = {self.lang}_nilnode();
+""")
         if rule["order"] == "l":
-            file.write("""
-    for (ptrdiff_t opr = 0; opr < len2 - 1; ++opr) {""")
+            file.write(f"""
+    for (ptrdiff_t opr = 0; opr < len2; opr = {skip}(s2, len2, opr)) {{""")
         else:
-            file.write("""
-    for (ptrdiff_t opr = len2; --opr > 0;) {""")
+            file.write(f"""
+    for (ptrdiff_t opr = len2; (opr = {skip}(s2, len2, opr)) > 0;) {{""")
 
         file.write(f"""
+        left = {self.lang}_delnode(left);
+        right = {self.lang}_delnode(right);
         if (!strchr("{self.rules_to_keys(rules)}", s2[opr])) continue;
         char *right_p = s2 + opr + 1;
         ptrdiff_t right_len = len2 - opr - 1;
-        int left, right;
         if (tryParse_{rule["left"]}(s2, opr, &left)
             && tryParse_{rule["right"]}(right_p, right_len, &right))
         {{
             if (out_value) {{
-                *out_value = """)
+                """)
 
-        for r in rules:
-            f = r["function"]
-            vals = self.binary_functions()
+        for r in rules:        
+            file.write(f"""if (s2[opr] == '{r["key"]}')
+                    *out_value = {self.lang}_newnode_{r["function"]}_2(left, right);
+                else """)
 
-            if f not in vals.keys():
-                return False
-        
-            file.write(f"""s[opr] == '{r["key"]}' ? {vals[f]}
-                    : """)
-
-        file.write(f"""left;
+        file.write(f"""{{
+                    *out_value = left;
+                    {self.lang}_delnode(right);
+                }}
             }}
             return true;
         }}
