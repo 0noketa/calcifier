@@ -1,0 +1,14 @@
+root call
+# new rule for lexical analyzer
+# block ( )
+rule tuple_last r 1  n -  -  ) nop
+rule tuple_mid1 l 2  n tuple_last  tuple_mid0  , add
+rule tuple_mid0 l 2  n tuple_mid1  tuple_last  , add
+rule tuple l 1  - tuple_mid0  n  ( nop
+rule call l 2  n tuple_mid0  tuple  ( mul
+end
+
+0
+(1)
+(2,3)  # 2+3
+4(5,6,7)  #4*(5+6+7)

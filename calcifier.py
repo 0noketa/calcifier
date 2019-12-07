@@ -217,20 +217,26 @@ bool {self.lang}_tryParse(char *s, ptrdiff_t len, node_t *out_value) {{
 
         file.write(f"""
 static bool tryParseName(char *s, ptrdiff_t len, node_t *out_value) {{
-    char *s2;
-    ptrdiff_t len2;
     if (s == NULL || !*s || len == 0
-        || !tryTrim(s, len, &s2, &len2)
-        || len2 == 0)
+        || !tryTrim(s, len, &s, &len)
+        || len == 0)
         return false;
-    if (len2 == 1 && strchr("{self.escape_str(self.vars)}", *s2)) {{
-        if (out_value) *out_value = {self.lang}_newnode_name_0(s2, 1);
+    if (len == 1 && strchr("{self.escape_str(self.vars)}", *s)) {{
+        if (out_value) *out_value = {self.lang}_newnode_name_0(s, 1);
         return true;
-    }} else if (len2 == {len(self.it)} && strncmp(s2, "{self.escape_str(self.it)}", {len(self.it)}) == 0) {{
+    }} else if (len == {len(self.it)} && strncmp(s, "{self.escape_str(self.it)}", {len(self.it)}) == 0) {{
         if (out_value) *out_value = {self.lang}_newnode_it_0();
         return true;
     }}
     return false;
+}}
+static bool tryParse_n(char *s, ptrdiff_t len, node_t *out_value) {{
+    if (s == NULL || !*s || len == 0
+        || !tryTrim(s, len, &s, &len)
+        || len == 0)
+        return false;
+    return {self.lang}_tryParseValue(s, len, out_value)
+        || tryParseName(s, len, out_value);
 }}
 """)
 
@@ -303,20 +309,24 @@ static bool tryParseName(char *s, ptrdiff_t len, node_t *out_value) {{
 """)
 
         if rule["argc"] == 1:
+            if rule["left"] != "-" and rule["right"] != "-":
+                return False
+
             if rule["order"] == "l":
-                if rule["left"] != "-" or rule["right"] != "n" or rule["next"] != "n":
-                    return False
                 idx = "0"
                 next_idx = "s2 + 1" 
             else:
-                if rule["right"] != "-" or rule["left"] != "n" or rule["next"] != "n":
-                    return False
                 idx = "len2 - 1"
                 next_idx = "s2"
 
+            if rule["left"] != "-":
+                child = "left"
+            else:
+                child = "right"
+
             file.write(f"""
     if (strchr("{self.rules_to_keys(rules)}", s2[{idx}])
-        && {self.func_name(rule)}({next_idx}, len2 - 1, out_value))
+        && tryParse_{rule[child]}({next_idx}, len2 - 1, out_value))
     {{
         if (out_value) {{
             """)
@@ -333,12 +343,21 @@ static bool tryParseName(char *s, ptrdiff_t len, node_t *out_value) {{
         }}
         return true;
     }}
-    return {self.lang}_tryParseValue(s2, len2, out_value)
-        || tryParseName(s2, len2, out_value);
-}}""")
+    return """)
+
+            if rule["next"] == "-":
+                file.write("false")
+            else:
+                file.write(f"""tryParse_{rule["next"]}(s2, len2, out_value)""")
+        
+            file.write(""";
+}""")
             return True
 
         if rule["argc"] != 2:
+            return False
+
+        if rule["left"] == "-" or rule["right"] == "-":
             return False
 
         # any binary operators
@@ -377,8 +396,14 @@ static bool tryParseName(char *s, ptrdiff_t len, node_t *out_value) {{
             return true;
         }}
     }}
-    return tryParse_{rule["next"]}(s2, len2, out_value);
-}}
+    return """)
+        if rule["next"] == "-":
+            file.write('false')
+        else:
+            file.write(f'tryParse_{rule["next"]}(s2, len2, out_value)')
+
+        file.write(""";
+}
 """)
 
         return True
