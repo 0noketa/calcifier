@@ -8,9 +8,7 @@ class Calcifier:
         self.lang = "calcifier_calc"
         self.rules = {}
         self.rules_by_priority = {}
-        self.it = "it"
-        self.node_type = "calcifier_calc_node_t*"
-        self.vars = self.crange("a", "z")
+        self.node_type = ""
 
     def priorities(self):
         return self.rules_by_priority.keys()
@@ -40,13 +38,10 @@ class Calcifier:
             if self.load_lang(src):
                 continue
 
+            if self.load_type(src):
+                continue
+
             if self.load_root(src):
-                continue
-
-            if self.load_vars(src):
-                continue
-
-            if self.load_it(src):
                 continue
 
             if self.load_rule(src):
@@ -55,6 +50,9 @@ class Calcifier:
             print(f'#error "{src}"')
 
             return False
+
+        if self.node_type == "":
+            self.node_type = self.lang + "_node_t"
 
         return True
 
@@ -76,32 +74,10 @@ class Calcifier:
 
     def load_type(self, src: list) -> bool:
         if len(src) == 2 and src[0] == "type":
-            self.value_type = src[1]
+            self.node_type = src[1]
 
             return True
 
-        return False
-
-    def load_vars(self, src: list) -> bool:
-        if len(src) > 0 and src[0] == "vars":
-            self.vars = set()
-
-            for rng in src[1:]:
-                if len(rng) == 2:
-                    self.vars |= self.crange(rng[0], rng[1])
-                else:
-                    self.vars |= set([rng])
-                    
-            return True
-
-        return False
-
-    def load_it(self, src: list) -> bool:
-        if len(src) >= 2 and src[0] == "it":
-            self.it = src[1]
-
-            return True
-        
         return False
 
     # bug: maybe this function has any well-known name
@@ -154,9 +130,9 @@ class Calcifier:
 
     def dump(self, file: io.TextIOWrapper):
         file.writelines([
-            f'root {self.root}\n',
-            f'vars {" ".join(self.vars)}\n',
-            f'it {self.it}\n'
+            f'lang {self.lang}\n',
+            f'type {self.node_type}\n',
+            f'root {self.root}\n'
         ])
 
         for key in self.priorities():
@@ -196,8 +172,6 @@ class Calcifier:
         return True
 
     def generate_header(self, file: io.TextIOWrapper):
-        keys = ", ".join(list(map(str, map(ord, self.vars))))
-
         file.write(f"""
 #include "calcifier_rtl.h"
 #include "{self.lang}.h"
@@ -216,27 +190,12 @@ bool {self.lang}_tryParse(char *s, ptrdiff_t len, node_t *out_value) {{
 """)
 
         file.write(f"""
-static bool tryParseName(char *s, ptrdiff_t len, node_t *out_value) {{
-    if (s == NULL || !*s || len == 0
-        || !tryTrim(s, len, &s, &len)
-        || len == 0)
-        return false;
-    if (len == 1 && strchr("{self.escape_str(self.vars)}", *s)) {{
-        if (out_value) *out_value = {self.lang}_newnode_name_0(s, 1);
-        return true;
-    }} else if (len == {len(self.it)} && strncmp(s, "{self.escape_str(self.it)}", {len(self.it)}) == 0) {{
-        if (out_value) *out_value = {self.lang}_newnode_it_0();
-        return true;
-    }}
-    return false;
-}}
 static bool tryParse_n(char *s, ptrdiff_t len, node_t *out_value) {{
     if (s == NULL || !*s || len == 0
         || !tryTrim(s, len, &s, &len)
         || len == 0)
         return false;
-    return {self.lang}_tryParseValue(s, len, out_value)
-        || tryParseName(s, len, out_value);
+    return {self.lang}_tryParseValue(s, len, out_value);
 }}
 """)
 

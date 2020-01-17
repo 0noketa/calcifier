@@ -14,8 +14,8 @@
 
 extern bool tryTrim(char *s, ptrdiff_t len, char **out_s, ptrdiff_t *out_len);
 
-extern ptrdiff_t calcifier_calc_skipl(char *s, ptrdiff_t len, ptrdiff_t i);
-extern ptrdiff_t calcifier_calc_skipr(char *s, ptrdiff_t len, ptrdiff_t i);
+extern ptrdiff_t calcifier_skipl(char *s, ptrdiff_t len, ptrdiff_t i);
+extern ptrdiff_t calcifier_skipr(char *s, ptrdiff_t len, ptrdiff_t i);
 
 
 #endif

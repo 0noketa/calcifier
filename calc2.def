@@ -1,6 +1,4 @@
 root 8
-it it
-vars az
 rule 0 l 1 - n n + nop - neg = setit * get / nop % nop
 rule 1 r 2 1 0 0 * mul / div % mod
 rule 2 r 2 2 1 1 + add - sub
