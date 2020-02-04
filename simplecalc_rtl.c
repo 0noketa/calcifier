@@ -7,6 +7,8 @@
 typedef MY(node_t) node_t;
 
 
+static node_t newnode(char *s) { return atoi(s); }
+
 node_t MY(nilnode)(void) { return 0; }
 node_t MY(delnode)(node_t x) { return 0; }
 
@@ -46,21 +48,21 @@ static bool validateInt(char *s, ptrdiff_t len) {
 }
 
 bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
-    if (s == NULL || !*s || len == 0) return false;
+    if (s == NULL || !*s
+        || tryTrim(s, len, &s, &len) || len == 0)
+        return false;
 
     const int lim = 256;
     char buf[256];
     
     if (len > lim - 1) len = lim - 1;
 
-    tryTrim(s, len, &s, &len);
-
     if (validateInt(s, len)) {
         strncpy(buf, s, len);
         buf[len] = 0;
         
         if (out_value)
-            *out_value = atoi(buf);
+            *out_value = newnode(buf);
 
         return true;
     } else {
@@ -68,12 +70,10 @@ bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
     }
 }
 
-ptrdiff_t MY(skipl)(char *s, ptrdiff_t len, ptrdiff_t i)
-{
+ptrdiff_t MY(skipl)(char *s, ptrdiff_t len, ptrdiff_t i) {
     return calcifier_skipl(s, len, i);
 }
-ptrdiff_t MY(skipr)(char *s, ptrdiff_t len, ptrdiff_t i)
-{
+ptrdiff_t MY(skipr)(char *s, ptrdiff_t len, ptrdiff_t i) {
     return calcifier_skipr(s, len, i);
 }
 

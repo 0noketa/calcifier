@@ -8,21 +8,19 @@ typedef MY(nodev_t) nodev_t;
 typedef MY(node_t) node_t;
 
 
-node_t MY(newnode)(char *s)
-{
+static node_t newnode(char *s) {
     node_t r = malloc(sizeof(nodev_t));
 
     if (!r) return NULL;
 
     mpz_init(r);
-    mpz_set_str(r, s, 16);
+    mpz_set_str(r, s, BICALC_BASE);
 
     return r;
 }
 node_t MY(nilnode)(void) { return NULL; }
 node_t MY(delnode)(node_t x) {
-    if (x != NULL)
-    {
+    if (x != NULL) {
         mpz_clear(x);
         free(x);
     }
@@ -50,7 +48,7 @@ NODEN2(mod_2) { mpz_mod(x, x, y); mpz_clear(y); free(y); return x; }
 NODEN2(equ_2) { int n = !mpz_cmp(x, y); mpz_clear(y); free(y); mpz_set_si(x, n); return x; }
 NODEN2(neq_2) { int n = !!mpz_cmp(x, y); mpz_clear(y); free(y); mpz_set_si(x, n); return x; }
 NODEN2(lt_2) { int n = mpz_cmp(x, y) < 0; mpz_clear(y); free(y); mpz_set_si(x, n); return x; }
-NODEN2(gt_2) { int n = mpz_cmp(x, y) < 0; mpz_clear(y); free(y); mpz_set_si(x, n); return x; }
+NODEN2(gt_2) { int n = mpz_cmp(x, y) > 0; mpz_clear(y); free(y); mpz_set_si(x, n); return x; }
 
 
 static bool validateInt(char *s, ptrdiff_t len) {
@@ -64,9 +62,9 @@ static bool validateInt(char *s, ptrdiff_t len) {
 }
 
 bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
-    if (s == NULL || !*s || len == 0) return false;
-
-    tryTrim(s, len, &s, &len);
+    if (s == NULL || !*s
+        || tryTrim(s, len, &s, &len) || len == 0)
+        return false;
 
     char *buf = malloc(len + 1);
     
@@ -76,7 +74,7 @@ bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
 
         if (out_value)
         {
-            node_t r = MY(newnode)(buf);
+            node_t r = newnode(buf);
             free(buf);
 
             if (!r) return false;
@@ -90,12 +88,10 @@ bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
     }
 }
 
-ptrdiff_t MY(skipl)(char *s, ptrdiff_t len, ptrdiff_t i)
-{
+ptrdiff_t MY(skipl)(char *s, ptrdiff_t len, ptrdiff_t i) {
     return calcifier_skipl(s, len, i);
 }
-ptrdiff_t MY(skipr)(char *s, ptrdiff_t len, ptrdiff_t i)
-{
+ptrdiff_t MY(skipr)(char *s, ptrdiff_t len, ptrdiff_t i) {
     return calcifier_skipr(s, len, i);
 }
 

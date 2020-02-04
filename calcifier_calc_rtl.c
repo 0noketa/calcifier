@@ -180,14 +180,10 @@ static bool validateInt(char *s, ptrdiff_t len) {
 }
 
 static bool tryParseInt(char *s, ptrdiff_t len, node_t *out_value) {
-    if (s == NULL || !*s || len == 0) return false;
-
     const int lim = 256;
     char buf[256];
     
     if (len > lim - 1) len = lim - 1;
-
-    tryTrim(s, len, &s, &len);
 
     if (validateInt(s, len)) {
         strncpy(buf, s, len);
@@ -204,11 +200,6 @@ static bool tryParseInt(char *s, ptrdiff_t len, node_t *out_value) {
 }
 
 static bool tryParseName(char *s, ptrdiff_t len, node_t *out_value) {
-    if (s == NULL || !*s || len == 0
-        || !tryTrim(s, len, &s, &len)
-        || len == 0)
-        return false;
-
     size_t vars_len = strlen(CALCIFIER_CALC_VARS);
     size_t it_len = strlen(CALCIFIER_CALC_IT);
 
@@ -232,12 +223,10 @@ bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
         || tryParseName(s, len, out_value);
 }
 
-ptrdiff_t MY(skipl)(char *s, ptrdiff_t len, ptrdiff_t i)
-{
+ptrdiff_t MY(skipl)(char *s, ptrdiff_t len, ptrdiff_t i) {
     return calcifier_skipl(s, len, i);
 }
-ptrdiff_t MY(skipr)(char *s, ptrdiff_t len, ptrdiff_t i)
-{
+ptrdiff_t MY(skipr)(char *s, ptrdiff_t len, ptrdiff_t i) {
     return calcifier_skipr(s, len, i);
 }
 

@@ -4,6 +4,10 @@
 #include <gmp.h>
 #include "calcifier_rtl.h"
 
+#ifndef BICALC_BASE
+#define BICALC_BASE 16
+#endif
+
 typedef MP_INT bicalc_nodev_t;
 typedef MP_INT *bicalc_node_t;
 
