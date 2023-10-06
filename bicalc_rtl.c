@@ -54,17 +54,15 @@ NODEN2(gt_2) { int n = mpz_cmp(x, y) > 0; mpz_clear(y); free(y); mpz_set_si(x, n
 static bool validateInt(char *s, ptrdiff_t len) {
     if (s == NULL || !*s || len == 0) return false;
 
-    ptrdiff_t i;
+    ptrdiff_t i = 0;
 
-    for (; i < len && (isdigit(s[i]) || toupper(s[i]) >= 'A' && toupper(s[i]) <= 'F'); ++i);
+    for (; i < len && (isdigit(s[i]) || toupper(s[i]) - 'A' < BICALC_BASE - 10); ++i);
 
     return i >= len;
 }
 
 bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
-    if (s == NULL || !*s
-        || tryTrim(s, len, &s, &len) || len == 0)
-        return false;
+    if (s == NULL || !*s || len == 0) return false;
 
     char *buf = malloc(len + 1);
     

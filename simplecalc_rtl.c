@@ -48,9 +48,7 @@ static bool validateInt(char *s, ptrdiff_t len) {
 }
 
 bool MY(tryParseValue)(char *s, ptrdiff_t len, node_t *out_value) {
-    if (s == NULL || !*s
-        || tryTrim(s, len, &s, &len) || len == 0)
-        return false;
+    if (s == NULL || !*s || len == 0) return false;
 
     const int lim = 256;
     char buf[256];
